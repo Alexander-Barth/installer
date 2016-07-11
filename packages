@@ -1,5 +1,9 @@
 #!/bin/bash
 
+
+tmpdir=$PWD/tmp
+mkdir $tmpdir
+
 containsElement () {
   local e
   for e in "${@:2}"; do [[ "$e" == "$1" ]] && return 0; done
@@ -51,11 +55,11 @@ function build() {
 	shift
     done
 
-    if sucessful $prefix $name; then
-	echo "$name already present in $prefix"
-	moduleload $prefix
-	return
-    fi
+    # if sucessful $prefix $name; then
+    # 	echo "$name already present in $prefix"
+    # 	moduleload $prefix
+    # 	return
+    # fi
 
     if [[ $package == ftp* ]] || [[ $package == http* ]]; then
 	file=$(basename $package)
@@ -93,49 +97,93 @@ function build() {
     make install | tee make_install.log
     cd ..
 
-    moduleload $prefix
+#    moduleload $prefix
 }
 
 PACKAGES=
 DIR=/tmp/
 JOBS=3
+PREFIX=$HOME/local/
+CC=gcc
+FC=gfortran
 
-while [[ $# -gt 1 ]]
-do
+ACTION="$1"
+shift
+
+while [[ $# -gt 1 ]]; do
 key="$1"
 
 case $key in
-    -p|--packages)
-    PACKAGES="$2"
+    -j|--jobs)
+    JOBS="$2"
     shift # past argument
     ;;
-    -d|--dir)
-    DIR="$2"
+    -j=*|--jobs=*)
+    JOBS="${key#*=}"
+    ;;
+    --fc|--fortran-compiler)
+    FC="$2"
     shift # past argument
     ;;
-    --default)
-    DEFAULT=YES
+    --fc=*|--fortran-compiler=)
+    FC="${key#*=}"
+    ;;
+    --cc|--c-compiler)
+    CC="$2"
+    shift # past argument
+    ;;
+    --cc=*|--c-compiler=)
+    CC="${key#*=}"
+    ;;
+    --verbose)
+    VERBOSE=YES
     ;;
     *)
+	break
             # unknown option
     ;;
 esac
 shift # past argument or value
 done
 
+PACKAGES=( "$@" )
 
-IFS=',' read -r -a PKGS <<< "$PACKAGES"
+echo action "${ACTION}"
+echo what "${PACKAGES}"
+echo JOBS "${JOBS}"
+echo VERBOSE "${VERBOSE}"
+
+for arg in "${PACKAGES[@]}"; do
+    echo package "$arg"
+done
+
+HDF5_VERSION=1.8.15
+HDF5_URL=http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-$HDF5_VERSION/src/hdf5-$HDF5_VERSION.tar.gz
+
+
+NETCDF_VERSION=4.3.3.1
+NETCDF_URL=http://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-$NETCDF_VERSION.tar.gz
+
+NETCDF_FORTRAN_VERSION=4.4.4
+NETCDF_FORTRAN_URL=ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-fortran-$NETCDF_FORTRAN_VERSION.tar.gz
+
+
 
 for i in hdf5 netcdf; do
     if containsElement "hdf5" "${PACKAGES[@]}"; then
-        HDF5_VERSION=1.8.17
-        HDF5_URL=http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-$HDF5_VERSION.tar.gz
-
-        build --package $HDF5_URL --prefix $HDF5 --name hdf5 \
-	    --configArgs "--enable-shared --enable-static"
-        
-        
+        build --package $HDF5_URL --prefix $PREFIX --name hdf5 \
+	    --configArgs "CC=$CC --enable-shared --enable-static"                
     fi
-    
+
+    if containsElement "netcdf" "${PACKAGES[@]}"; then
+	build --package $NETCDF_URL --prefix $PREFIX  --name netcdf --check yes \
+	      --configArgs "CC=$CC FC=$FC CPPFLAGS=-I$PREFIX/include  LDFLAGS=-L$PREFIX/lib"	
+    fi
+
+    if containsElement "netcdf-fortran" "${PACKAGES[@]}"; then
+	build --package $NETCDF_FORTRAN_URL --prefix $PREFIX  --name netcdf --check yes \
+	      --configArgs "CC=$CC FC=$FC CPPFLAGS=-I$PREFIX/include  LDFLAGS=-L$PREFIX/lib"	
+    fi
+
 done
 
