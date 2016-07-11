@@ -121,6 +121,13 @@ case $key in
     -j=*|--jobs=*)
     JOBS="${key#*=}"
     ;;
+    -p|--prefix)
+    PREFIX="$2"
+    shift # past argument
+    ;;
+    -p=*|--prefix=*)
+    PREFIX="${key#*=}"
+    ;;
     --fc|--fortran-compiler)
     FC="$2"
     shift # past argument
