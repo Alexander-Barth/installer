@@ -1,0 +1,141 @@
+#!/bin/bash
+
+containsElement () {
+  local e
+  for e in "${@:2}"; do [[ "$e" == "$1" ]] && return 0; done
+  return 1
+}
+
+function build() {
+    local configArgs=
+    local makeArgs=
+    local packageDir=
+    local check=no
+    local buildsystem=gnu  # gnu (for configure) or cmake
+
+    while [ "$1" != "" ]; do
+	case $1 in
+	    "--package")
+		shift
+		package="$1"
+		;;
+	    "--name")
+		shift
+		name="$1"
+		;;
+	    "--packagedir")
+		shift
+		packageDir="$1"
+		;;
+	    "--check")
+		shift
+		check="$1"
+		;;
+	    "--prefix")
+		shift
+		prefix="$1"
+		;;
+	    "--configArgs")
+		shift
+		configArgs="$1"
+		;;
+	    "--makeArgs")
+		shift
+		makeArgs="$1"
+		;;
+	    "--buildsystem")
+		shift
+		buildsystem="$1"
+		;;
+	esac
+	shift
+    done
+
+    if sucessful $prefix $name; then
+	echo "$name already present in $prefix"
+	moduleload $prefix
+	return
+    fi
+
+    if [[ $package == ftp* ]] || [[ $package == http* ]]; then
+	file=$(basename $package)
+
+	if [ -f $file ]; then
+            echo "$package already downloaded"
+	else
+            echo download $package
+            wget $package
+	fi
+    else
+	file=$package
+    fi
+
+    if [[ -z $packageDir ]]; then
+	packageDir=$(echo $file | sed 's/.tar.*//')
+    fi
+
+    rm -Rf $packageDir
+    tar -xf $file
+    cd $packageDir
+
+    if [ $buildsystem == gnu ]; then
+      ./configure --prefix=$prefix  $configArgs | tee configure.log
+    else
+      cmake -DCMAKE_INSTALL_PREFIX:PATH=$prefix | tee cmake.log
+    fi
+
+    make -j $JOBS $makeArgs | tee make.log
+
+    if [[ $check == yes ]]; then
+	make check | tee make_check.log
+    fi
+
+    make install | tee make_install.log
+    cd ..
+
+    moduleload $prefix
+}
+
+PACKAGES=
+DIR=/tmp/
+JOBS=3
+
+while [[ $# -gt 1 ]]
+do
+key="$1"
+
+case $key in
+    -p|--packages)
+    PACKAGES="$2"
+    shift # past argument
+    ;;
+    -d|--dir)
+    DIR="$2"
+    shift # past argument
+    ;;
+    --default)
+    DEFAULT=YES
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+shift # past argument or value
+done
+
+
+IFS=',' read -r -a PKGS <<< "$PACKAGES"
+
+for i in hdf5 netcdf; do
+    if containsElement "hdf5" "${PACKAGES[@]}"; then
+        HDF5_VERSION=1.8.17
+        HDF5_URL=http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-$HDF5_VERSION.tar.gz
+
+        build --package $HDF5_URL --prefix $HDF5 --name hdf5 \
+	    --configArgs "--enable-shared --enable-static"
+        
+        
+    fi
+    
+done
+
