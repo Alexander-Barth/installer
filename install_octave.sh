@@ -1,49 +1,7 @@
 #!/bin/bash
-# Author: Alexander Barth, 2013-2015
+# Author: Alexander Barth, 2013-2016
 #
-# Install octave and most dependencies.
-# openblas, arpack, suitesparse, qrupdate, qhull, glpk, fftw, HDF5, FLTK, 
-# readline, gnuplot, cURL, PCRE, freetype, expat, netcdf, graphicsmagick, 
-# pstoedit, epstool, transfig, llvm, gl2ps, metis, octave,
-#
-# octave-forge packages
-# general miscellaneous optim struct statistics io octcdf optiminterp netcdf 
-# ncarray parallel
-#
-# What is not installed:
-#
-# qt4 (Red Hat: qt-devel)
-# QScintilla  (Red Hat: qscintilla-devel) -> refuses to install in custom prefix
-# java
-#
-# Issues with fontconfig
-# http://modb.oce.ulg.ac.be/mediawiki/index.php/Octave#fontconfig
-# Problem goes away if one installs fontconfig-devel, instead of compiling from source.
-
-
-# Notes for nic4:
-# For MKL, the env. variable MKL and INTEL_CC_HOME must be defined:
-# e.g. 
-# export MKL=/cm/shared/apps/intel/composer_xe/2013_sp1.1.106/mkl/lib/intel64
-# export INTEL_CC_HOME=/cm/shared/apps/intel/composer_xe/2013_sp1.1.106
-# export LD_LIBRARY_PATH="$INTEL_CC_HOME/compiler/lib/intel64:$LD_LIBRARY_PATH"
-#
-# Do not load the module. Just set the two variables, otherwise suitesparse will fail.
-# Load also java module e.g.
-#
-# module load java/jdk1.7.0_51
-# module load gcc/4.8.1
-#
-# then
-# ~/matlab/bin/install_octave.sh --blas MKL  --separate no --download yes --postfix -mkl-$(date +%Y%m%d) 2>&1 | tee install.log
-#
-# The following environement variable must be defined to run octave (if the option seprate was no during the installation)
-#
-# # install directory, e.g.  /home/ulg/gher/abarth/local/gcc-4.8.1-mkl-20140814
-# PREFIX=... 
-# export PATH="$PREFIX/bin:$PATH"
-# export LD_LIBRARY_PATH="$PREFIX/lib:$MKL:$LD_LIBRARY_PATH"
-
+# Install
 
 set -e
 
@@ -56,7 +14,6 @@ FLIBS="-lgfortran"
 JOBS=8
 showpath=
 dodownload=yes
-separate=yes
 separate=no
 PREFIX=
 postfix=
@@ -70,38 +27,38 @@ PATCHDIR=$HOME/matlab/bin/patch/
 
 while [ "$1" != "" ]; do
     case $1 in
-	"--blas")
+	--blas)
             shift
             USE_BLAS=$1
             ;;
 	--blas=*)
             USE_BLAS="${key#*=}"
             ;;
-	"-j" | "--jobs")
+	-j | --jobs)
 	    shift
-            JOBS=$1
+            JOBS="$1"
             ;;
         -j=*|--jobs=*)
             JOBS="${key#*=}"
             ;;
-	"--showpath")
+	--showpath)
 	    showpath=1
 	    ;;
-	"--download")
+	--download)
             shift
 	    dodownload=$1
 	    ;;
 	--download=*)
 	    dodownload="${key#*=}"
 	    ;;
-	"--separate")
+	--separate)
             shift
 	    separate=$1
 	    ;;
 	--separate=*)
 	    separate="${key#*=}"
 	    ;;
-	"-b" | "--basedir" | "--prefix")
+	-b | --basedir | --prefix)
 	    shift
             PREFIX=$1
             ;;
@@ -109,15 +66,15 @@ while [ "$1" != "" ]; do
             PREFIX="${key#*=}"
             ;;
         --fc|--fortran-compiler)
-            FC="$2"
-            shift # past argument
+            shift
+            FC="$1"
             ;;
         --fc=*|--fortran-compiler=)
             FC="${key#*=}"
             ;;
         --cc|--c-compiler)
-            CC="$2"
-            shift # past argument
+            shift
+            CC="$1"
             ;;
         --cc=*|--c-compiler=)
             CC="${key#*=}"
@@ -276,7 +233,7 @@ OCTAVE_URL=ftp://ftp.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
 if [ $USE_BLAS == openblas ]; then
     echo "using openblas"
     BLAS=$OPENBLAS
-    BLAS_LIBDIR="$BLAS/lib"
+    BLAS_LIBDIR="$BLAS_PREFIX/lib"
   # full linking options for BLAS
     BLAS_LIB="-L$BLAS_LIBDIR -lopenblas $FLIBS -lpthread"
     LAPACK_LIB="$BLAS_LIB"
@@ -358,6 +315,25 @@ function sucessful() {
   fi
 
   return 1;
+}
+
+function message() {
+    local importance=$1
+    local message=$2
+
+    if (( $importance < 1 )); then
+        # ignore
+        return
+    fi
+
+    if [ $importance == 3 ]; then
+        echo -e "\e[32m$message\e[0m"
+    elif [ $importance == 2 ]; then
+        echo -e "\e[34m$message\e[0m"
+    else
+        echo $message
+    fi
+
 }
 
 function build() {
@@ -454,10 +430,11 @@ function OPENBLAS_build() {
     cd *OpenBLAS*/
 # use threaded OPENBLAS
     make FC=$FC BINARY64=1 USE_THREAD=1 -j $JOBS | tee make.log
+
 # disable threaded OPENBLAS
 #    make FC=$FC BINARY64=1 USE_THREAD=0 -j $JOBS | tee make.log
-    make PREFIX=$OPENBLAS install | tee make_install.log
-    cd $OPENBLAS/lib
+    make PREFIX=$OPENBLAS_PREFIX install | tee make_install.log
+    cd $OPENBLAS_PREFIX/lib
     ln -s libopenblas.a libblas.a
     ln -s libopenblas.so libblas.so
     cd - 
@@ -471,8 +448,8 @@ function BLAS_build() {
     cd BLAS
     make FORTRAN=$FC OPTS="$PICFLAG -O3 $FFLAGS" BLASLIB=libblas.a
 
-    mkdir -p $BLAS/lib
-    cp libblas.a $BLAS/lib
+    mkdir -p $BLAS_PREFIX/lib
+    cp libblas.a $BLAS_PREFIX/lib
     cd ..
 }
 
@@ -485,8 +462,8 @@ function LAPACK_build() {
     make FORTRAN=$FC LOADER=$FC OPTS="-funroll-all-loops -O3 $PICFLAG $FFLAGS" NOOPT="$PICFLAG" PLAT=  \
 	LAPACKLIB=liblapack.a  BLASLIB=$BLAS_PREFIX/lib/libblas.a TIMER=INT_ETIME  lapacklib | tee make.log
 
-    mkdir -p $LAPACK/lib
-    mv liblapack.a $LAPACK/lib/
+    mkdir -p $LAPACK_PREFIX/lib
+    mv liblapack.a $LAPACK_PREFIX/lib/
     make clean
     cd ..
 }
@@ -513,8 +490,8 @@ function ARPACK_build() {
 	lib | tee make.log
 
 
-    mkdir -p $ARPACK/lib
-    cp libarpack.a $ARPACK/lib
+    mkdir -p $ARPACK_PREFIX/lib
+    cp libarpack.a $ARPACK_PREFIX/lib
     cd ..
 }
 
@@ -542,14 +519,14 @@ function QHULL_build() {
 }
 
 function SUITESPARSE_build() {
-    if sucessful $SUITESPARSE cholmod; then
-	echo "SUITESPARSE already present in $SUITESPARSE/lib"
-	moduleload $SUITESPARSE
+    if sucessful $SUITESPARSE_PREFIX cholmod; then
+	echo "SUITESPARSE already present in $SUITESPARSE_PREFIX/lib"
+	moduleload $SUITESPARSE_PREFIX
 	return
     fi
 
     wget --timestamping $SUITESPARSE_URL
-    mkdir -p $SUITESPARSE/{lib,include/suitesparse}
+    mkdir -p $SUITESPARSE_PREFIX/{lib,include/suitesparse}
 
     rm -Rf SuiteSparse 
     tar zxf SuiteSparse-$SUITESPARSE_VERSION.tar.gz   
@@ -576,14 +553,14 @@ function SUITESPARSE_build() {
     cd ..
     make | tee make.log
     # install libamd.a libbtf.a libccolamd.a libcholmod.a libcolamd.a libcxsparse.a libumfpack.a libmetis.a 
-    cp {AMD,BTF,CAMD,CCOLAMD,CHOLMOD,COLAMD,CXSparse,UMFPACK}/Lib/lib*a metis-4.0.3/libmetis.a $SUITESPARSE/lib/
-    cp {AMD,BTF,CAMD,CCOLAMD,CHOLMOD,COLAMD,CXSparse,UMFPACK}/Include/*h $SUITESPARSE/include/suitesparse
+    cp {AMD,BTF,CAMD,CCOLAMD,CHOLMOD,COLAMD,CXSparse,UMFPACK}/Lib/lib*a metis-4.0.3/libmetis.a $SUITESPARSE_PREFIX/lib/
+    cp {AMD,BTF,CAMD,CCOLAMD,CHOLMOD,COLAMD,CXSparse,UMFPACK}/Include/*h $SUITESPARSE_PREFIX/include/suitesparse
 
     if [ -e UFconfig/UFconfig.mk ]; then
-      cp UFconfig/*.h $SUITESPARSE/include/suitesparse
+      cp UFconfig/*.h $SUITESPARSE_PREFIX/include/suitesparse
     else
-      cp SuiteSparse_config/*.h $SUITESPARSE/include/suitesparse
-      cp SuiteSparse_config/libsuitesparseconfig.a $SUITESPARSE/lib/
+      cp SuiteSparse_config/*.h $SUITESPARSE_PREFIX/include/suitesparse
+      cp SuiteSparse_config/libsuitesparseconfig.a $SUITESPARSE_PREFIX/lib/
     fi 
 
     cd ..
@@ -596,7 +573,7 @@ function EPSTOOL_build() {
     tar -xf epstool-$EPSTOOL_VERSION.tar.gz 
     cd epstool-$EPSTOOL_VERSION
     make | tee make.log
-    make install EPSTOOL_ROOT=$EPSTOOL  | tee make_install.log
+    make install EPSTOOL_ROOT=$EPSTOOL_PREFIX  | tee make_install.log
     cd ..
 }
 
@@ -607,7 +584,7 @@ function TRANSFIG_build() {
     cd transfig.$TRANSFIG_VERSION/
     patch -p1 -u < $PATCHDIR/transfig-1-configure.patch 
     chmod +x ./configure
-    ./configure --prefix $TRANSFIG | tee configure.log
+    ./configure --prefix $TRANSFIG_PREFIX | tee configure.log
     make | tee make.log
     make install | tee make_install.log
     cd ..
@@ -617,7 +594,7 @@ function NETCDF_FORTRAN_build() {
 
     tar zxf netcdf-fortran-$NETCDF_FORTRAN_VERSION.tar.gz
     cd netcdf-fortran-$NETCDF_VERSION
-    ./configure FC=$FC CPPFLAGS="-I$HDF5/include"  LDFLAGS="-L$HDF5/lib" --prefix=$NETCDF
+    ./configure FC=$FC CPPFLAGS="-I$HDF5_PREFIX/include"  LDFLAGS="-L$HDF5_PREFIX/lib" --prefix=$NETCDF_FORTRAN_PREFIX
     make -j $JOBS | tee make.log
     make check | tee make_check.log
     make install | tee make_install.log
@@ -637,7 +614,7 @@ function QRUPDATE_build() {
 
     make -j $JOBS lib | tee make.log
     make test     | tee make_test.log
-    make PREFIX=$QRUPDATE install
+    make PREFIX=$QRUPDATE_PREFIX install
     cd .. 
 }
 
@@ -720,7 +697,7 @@ function all_build() {
 #    build --package $FONTCONFIG_URL --prefix $FONTCONFIG --name fontconfig
 
     build --package $NETCDF_URL --prefix $NETCDF  --name netcdf --check yes \
-	--configArgs "FC=$FC CPPFLAGS=-I$HDF5/include  LDFLAGS=-L$HDF5/lib"
+	--configArgs "FC=$FC CPPFLAGS=-I$HDF5_PREFIX/include  LDFLAGS=-L$HDF5_PREFIX/lib"
 
     build --package $TIFF_URL --prefix $TIFF --name tiff
 
@@ -750,7 +727,6 @@ function all_build() {
 function setup_prefixes() {
     # loop over all packages
 
-    echo 'here'
     for version in $(compgen -A variable | grep _VERSION); do
         NAME=${version%_VERSION}
         name=$(echo $NAME | tr '[:upper:]' '[:lower:]' | tr _ -)
@@ -772,50 +748,42 @@ function setup_prefixes() {
 
 
 
-if [[ ! -z $showpath ]]; then
-    echo "export PATH=\"$NETCDF/bin:\$PATH\""
-    echo "export LD_LIBRARY_PATH=\"$BLAS_LIBDIR:$SUITESPARSE/lib:$FFTW/lib:$QHULL/lib:$HDF5/lib:$GLPK/lib:$PCRE/lib:$NETCDF/lib:$QRUPDATE/lib:\$LD_LIBRARY_PATH\""
-else
 #    all_build
 
-    echo "PATH=$PATH"
-    echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+echo "PATH=$PATH"
+echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
-    setup_prefixes
-    
-    for name in "${PACKAGES[@]}"; do
-	echo $name
-        # upcase name
-        NAME=$(echo $name | tr '[:lower:]' '[:upper:]' | tr - _)
+setup_prefixes
 
-        # get URL and PREFIX
-        url=${NAME}_URL
-        URL=${!url}
+for name in "${PACKAGES[@]}"; do
+    echo $name
+    # upcase name
+    NAME=$(echo $name | tr '[:lower:]' '[:upper:]' | tr - _)
 
-        prefix=${NAME}_PREFIX
-        PREFIX=${!prefix}
+    # get URL and PREFIX
+    url=${NAME}_URL
+    URL=${!url}
 
-        echo prefix22 $prefix $PREFIX
-        if sucessful $PREFIX $name; then
-	    echo "$name already present"
-	    moduleload $PREFIX
+    prefix=${NAME}_PREFIX
+    PREFIX=${!prefix}
+
+    if sucessful $PREFIX $name; then
+        message 2 "$name is already present"
+        moduleload $PREFIX
+    else
+        message 3 "installing $name"
+        if type -t ${NAME}_build > /dev/null; then
+            message 0 "call ${NAME}_build"
+            # call specific build script
+            ${NAME}_build
         else
-            if type -t ${NAME}_build; then
-                echo call ${NAME}_build
-                # call specific build script
-                fun=${NAME}_build
-                $fun
-                #${NAME}_build
-            else
-                echo call generic ${NAME}_build
-                # call generic build script            
+            message 0 "call generic build script"
 
-                build --package $URL --prefix $PREFIX --name $name \
-                  --configArgs "--enable-shared"            
-            fi
-    
-            moduleload $PREFIX
+            build --package $URL --prefix $PREFIX --name $name \
+              --configArgs "--enable-shared --disable-static"
         fi
-    done
 
-fi
+        moduleload $PREFIX
+    fi
+done
+
