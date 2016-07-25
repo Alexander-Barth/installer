@@ -1,0 +1,83 @@
+#!/bin/bash
+
+local configArgs=
+local makeArgs=
+local packageDir=
+local check=no
+
+while [ "$1" != "" ]; do
+    case $1 in
+        "--package")
+            shift
+            package="$1"
+            ;;
+        "--name")
+            shift
+            name="$1"
+            ;;
+        "--packagedir")
+            shift
+            packageDir="$1"
+            ;;
+        "--check")
+            shift
+            check="$1"
+            ;;
+        "--prefix")
+            shift
+            prefix="$1"
+            ;;
+        "--configArgs")
+            shift
+            configArgs="$1"
+            ;;
+        "--makeArgs")
+            shift
+            makeArgs="$1"
+            ;;
+    esac
+    shift
+done
+
+# if sucessful $prefix $name; then
+# 	echo "$name already present in $prefix"
+# 	moduleload $prefix
+# 	return
+# fi
+
+if [[ $package == ftp* ]] || [[ $package == http* ]]; then
+    file=$(basename $package)
+
+    if [ -f $file ]; then
+        echo "$package already downloaded"
+    else
+        echo download $package
+        wget $package
+    fi
+else
+    file=$package
+fi
+
+if [[ -z $packageDir ]]; then
+    packageDir=$(echo $file | sed 's/.tar.*//')
+fi
+
+rm -Rf $packageDir
+tar -xf $file
+cd $packageDir
+
+if [ -x ./configure ]; then
+  ./configure --prefix=$prefix  $configArgs | tee configure.log
+elif [ -r ./CMakeLists.txt ]; then
+  cmake -DCMAKE_INSTALL_PREFIX:PATH=$prefix | tee cmake.log
+fi
+
+make -j $JOBS $makeArgs | tee make.log
+
+if [[ $check == yes ]]; then
+    make check | tee make_check.log
+fi
+
+make install | tee make_install.log
+cd ..
+
