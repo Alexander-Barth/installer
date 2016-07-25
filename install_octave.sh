@@ -40,9 +40,9 @@
 # The following environement variable must be defined to run octave (if the option seprate was no during the installation)
 #
 # # install directory, e.g.  /home/ulg/gher/abarth/local/gcc-4.8.1-mkl-20140814
-# BASEDIR=... 
-# export PATH="$BASEDIR/bin:$PATH"
-# export LD_LIBRARY_PATH="$BASEDIR/lib:$MKL:$LD_LIBRARY_PATH"
+# PREFIX=... 
+# export PATH="$PREFIX/bin:$PATH"
+# export LD_LIBRARY_PATH="$PREFIX/lib:$MKL:$LD_LIBRARY_PATH"
 
 
 set -e
@@ -58,7 +58,7 @@ showpath=
 dodownload=yes
 separate=yes
 separate=no
-BASEDIR=
+PREFIX=
 postfix=
 
 if [ "$CC" == gcc ]; then
@@ -74,9 +74,15 @@ while [ "$1" != "" ]; do
             shift
             USE_BLAS=$1
             ;;
+	--blas=*)
+            USE_BLAS="${key#*=}"
+            ;;
 	"-j" | "--jobs")
 	    shift
             JOBS=$1
+            ;;
+        -j=*|--jobs=*)
+            JOBS="${key#*=}"
             ;;
 	"--showpath")
 	    showpath=1
@@ -85,207 +91,186 @@ while [ "$1" != "" ]; do
             shift
 	    dodownload=$1
 	    ;;
+	--download=*)
+	    dodownload="${key#*=}"
+	    ;;
 	"--separate")
             shift
 	    separate=$1
 	    ;;
+	--separate=*)
+	    separate="${key#*=}"
+	    ;;
 	"-b" | "--basedir" | "--prefix")
 	    shift
-            BASEDIR=$1
+            PREFIX=$1
+            ;;
+        -p=*|--prefix=*)
+            PREFIX="${key#*=}"
+            ;;
+        --fc|--fortran-compiler)
+            FC="$2"
+            shift # past argument
+            ;;
+        --fc=*|--fortran-compiler=)
+            FC="${key#*=}"
+            ;;
+        --cc|--c-compiler)
+            CC="$2"
+            shift # past argument
+            ;;
+        --cc=*|--c-compiler=)
+            CC="${key#*=}"
             ;;
 	"--postfix")
 	    shift
             postfix=$1
             ;;
+	"--postfix=*")
+            postfix="${key#*=}"
+            ;;
+        *)
+	    break
+            # unknown option
+
     esac
     shift
 done
 
-if [[ ! $BASEDIR ]]; then
+PACKAGES=( "$@" )
+
+echo what "${PACKAGES}"
+
+if [[ ! $PREFIX ]]; then
     if [[ $separate == yes ]]; then
-        BASEDIR=$HOME/opt/$CC-$CCVERSION$postfix
+        PREFIX=$HOME/opt/$CC-$CCVERSION$postfix
     else
-        BASEDIR=$HOME/local/$CC-$CCVERSION$postfix
+        PREFIX=$HOME/local/$CC-$CCVERSION$postfix
     fi
 fi
 
 
 function pkgprefix() {
     if [[ $separate == yes ]]; then
-        echo $BASEDIR/$1-$2
+        echo $PREFIX/$1-$2
     else
-        echo $BASEDIR
+        echo $PREFIX
     fi 
 }
 
 # source all package information
-for f in pkgs/*; do 
-  source $f; 
-done
+#for f in pkgs/*; do 
+#  source $f; 
+#done
 
-echo "install in $BASEDIR"
+echo "install in $PREFIX"
 
 
 
 GCC_VERSION=4.8.2
 GCC_URL=ftp://gcc.gnu.org/pub/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz
-GCC=$(pkgprefix gcc $GCC_VERSION)
 
 BLAS_URL=http://www.netlib.org/blas/blas.tgz
 
-OPENBLAS=$(pkgprefix OpenBLAS $OPENBLAS_VERSION)
-
-GOTOBLAS2_VERSION=1.13
-GOTOBLAS2_URL=http://www.tacc.utexas.edu/documents/13601/b58aeb8c-9d8d-4ec2-b5f1-5a5843b4d47b
-GOTOBLAS2=$(pkgprefix GotoBLAS2 $GOTOBLAS_VERSION)
-
 LAPACK_VERSION=3.5.0
 LAPACK_URL=http://www.netlib.org/lapack/lapack-$LAPACK_VERSION.tgz
-LAPACK=$(pkgprefix lapack $LAPACK_VERSION)
 
 ARPACK_VERSION=96
 ARPACK_URL=http://www.caam.rice.edu/software/ARPACK/SRC/arpack96.tar.gz
 ARPACK_PATCH_URL=http://www.caam.rice.edu/software/ARPACK/SRC/patch.tar.gz
-ARPACK=$(pkgprefix arpack $ARPACK_VERSION)
 
  #http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.0.2.tar.gz # incompatible with suitesparse 3.7 and  4.0.1
 METIS_URL=http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/OLD/metis-4.0.3.tar.gz
 
-SUITESPARSE_VERSION=3.7.1
-# https://savannah.gnu.org/bugs/?func=detailitem&item_id=41209 -> fixed for octave 3.8.1 (supposely)
 SUITESPARSE_VERSION=4.2.1
 SUITESPARSE_URL=http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-$SUITESPARSE_VERSION.tar.gz
-
-SUITESPARSE=$(pkgprefix suitesparse $SUITESPARSE_VERSION)
 
 # http://www.fftw.org/download.html
 FFTW_VERSION=3.3.4
 FFTW_URL=ftp://ftp.fftw.org/pub/fftw/fftw-$FFTW_VERSION.tar.gz
-FFTW=$(pkgprefix fftw $FFTW_VERSION)
 
 # http://www.qhull.org/download/
 QHULL_VERSION=2012.1
 QHULL_URL=http://www.qhull.org/download/qhull-$QHULL_VERSION-src.tgz
-QHULL=$(pkgprefix qhull $QHULL_VERSION)
 
 # http://www.hdfgroup.org/HDF5/
-
 HDF5_VERSION=1.8.17
 HDF5_URL=http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-$HDF5_VERSION/src/hdf5-$HDF5_VERSION.tar.gz
-HDF5=$(pkgprefix hdf5 $HDF5_VERSION)
 
 # http://ftp.gnu.org/gnu/glpk/
-GLPK_VERSION=4.52 # incompatible
-GLPK_VERSION=4.46
 GLPK_VERSION=4.54
 GLPK_URL=http://ftp.gnu.org/gnu/glpk/glpk-$GLPK_VERSION.tar.gz
-GLPK=$(pkgprefix glpk $GLPK_VERSION)
 
 # http://www.gnuplot.info/download.html
 GNUPLOT_VERSION=5.0.4
 GNUPLOT_URL=http://downloads.sourceforge.net/gnuplot/gnuplot-$GNUPLOT_VERSION.tar.gz
-GNUPLOT=$(pkgprefix gnuplot $GNUPLOT_VERSION)
 
 FLTK_VERSION=1.3.2
 FLTK_URL=http://fltk.org/pub/fltk/$FLTK_VERSION/fltk-$FLTK_VERSION-source.tar.gz
-FLTK=$(pkgprefix fltk $FLTK_VERSION)
 
 # http://www.unidata.ucar.edu/downloads/netcdf/index.jsp
 NETCDF_VERSION=4.3.3.1
 NETCDF_FORTRAN_VERSION=4.4.2
 NETCDF_URL=http://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-$NETCDF_VERSION.tar.gz
-NETCDF=$(pkgprefix netcdf $NETCDF_VERSION)
 
 QRUPDATE_VERSION=1.1.2
 QRUPDATE_URL=http://downloads.sourceforge.net/project/qrupdate/qrupdate/1.2/qrupdate-$QRUPDATE_VERSION.tar.gz
-QRUPDATE=$(pkgprefix qrupdate $QRUPDATE_VERSION)
 
 # http://curl.haxx.se/download.html
 CURL_VERSION=7.50.0
 CURL_URL=http://curl.haxx.se/download/curl-$CURL_VERSION.tar.gz
-CURL=$(pkgprefix curl $CURL_VERSION)
 
 PCRE_VERSION=8.36
 PCRE_URL=http://sourceforge.net/projects/pcre/files/pcre/$PCRE_VERSION/pcre-$PCRE_VERSION.tar.gz
-PCRE=$(pkgprefix pcre $PCRE_VERSION)
 
 FREETYPE_VERSION=2.4.12
 FREETYPE_URL=http://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.gz
-FREETYPE=$(pkgprefix freetype $FREETYPE_VERSION)
 
 READLINE_VERSION=6.3
 READLINE_URL=ftp://ftp.cwru.edu/pub/bash/readline-$READLINE_VERSION.tar.gz
-READLINE=$(pkgprefix readline $READLINE_VERSION)
 
 TEXINFO_VERSION=4.13
 TEXINFO_URL=http://ftp.gnu.org/gnu/texinfo/texinfo-$TEXINFO_VERSION.tar.gz
-TEXINFO=$(pkgprefix texinfo $TEXINFO_VERSION)
 
 EXPAT_VERSION=2.1.0
 EXPAT_URL=http://downloads.sourceforge.net/project/expat/expat/$EXPAT_VERSION/expat-$EXPAT_VERSION.tar.gz
-EXPAT=$(pkgprefix expat $EXPAT_VERSION)
 
 FONTCONFIG_VERSION=2.10.2
 FONTCONFIG_URL=http://www.freedesktop.org/software/fontconfig/release/fontconfig-$FONTCONFIG_VERSION.tar.bz2
-FONTCONFIG=$(pkgprefix fontconfig $FONTCONFIG_VERSION)
 
 GRAPHICSMAGICK_VERSION=1.3.24
 GRAPHICSMAGICK_URL=http://downloads.sourceforge.net/project/graphicsmagick/graphicsmagick/$GRAPHICSMAGICK_VERSION/GraphicsMagick-$GRAPHICSMAGICK_VERSION.tar.gz
-GRAPHICSMAGICK=$(pkgprefix graphicsmagick $GRAPHICSMAGICK_VERSION)
 
 PSTOEDIT_VERSION=3.62
 PSTOEDIT_URL=http://sourceforge.net/projects/pstoedit/files/pstoedit/$PSTOEDIT_VERSION/pstoedit-$PSTOEDIT_VERSION.tar.gz
-PSTOEDIT=$(pkgprefix pstoedit $PSTOEDIT_VERSION)
 
 LLVM_VERSION=3.3
 LLVM_URL=http://llvm.org/releases/$LLVM_VERSION/llvm-$LLVM_VERSION.src.tar.gz
-LLVM=$(pkgprefix llvm $LLVM_VERSION)
 
 GL2PS_VERSION=1.3.8
 GL2PS_URL=http://geuz.org/gl2ps/src/gl2ps-$GL2PS_VERSION.tgz
-GL2PS=$(pkgprefix gl2ps $GL2PS_VERSION)
 
 EPSTOOL_VERSION=3.08
 # currently down
 EPSTOOL_URL=http://mirror.cs.wisc.edu/pub/mirrors/ghost/ghostgum/epstool-$EPSTOOL_VERSION.tar.gz
 EPSTOOL_URL=http://pkgs.fedoraproject.org/repo/pkgs/epstool/epstool-3.08.tar.gz/465a57a598dbef411f4ecbfbd7d4c8d7/epstool-3.08.tar.gz
-EPSTOOL=$(pkgprefix epstool $EPSTOOL_VERSION)
 
 
 TRANSFIG_VERSION=3.2.5e
 TRANSFIG_URL=https://downloads.sourceforge.net/project/mcj/mcj-source/transfig.$TRANSFIG_VERSION.tar.gz
-TRANSFIG=$(pkgprefix transfig $TRANSFIG_VERSION)
-
 
 TIFF_VERSION=4.0.3
 TIFF_URL=ftp://ftp.remotesensing.org/libtiff/tiff-$TIFF_VERSION.tar.gz
-TIFF=$(pkgprefix tiff $TIFF_VERSION)
 
 UNITS_VERSION=2.11
 UNITS_URL=http://ftp.gnu.org/gnu/units/units-$UNITS_VERSION.tar.gz
-UNITS=$(pkgprefix units $UNITS_VERSION)
 
-OCTAVE_VERSION=3.6.4
-OCTAVE_VERSION=3.8.1
-OCTAVE_VERSION=3.8.2
 OCTAVE_VERSION=4.0.3
 OCTAVE_URL=ftp://ftp.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
 #OCTAVE_VERSION=4.0.0-rc2
 #OCTAVE_URL=ftp://alpha.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
 
 
-OCTAVE=$(pkgprefix octave $OCTAVE_VERSION)
-
-
-if [ $USE_BLAS == gotoblas ]; then   
-    echo "using gotoblas"
-    BLAS=$OPENBLAS
-    BLAS_LIBDIR="$BLAS/lib"
-    # full linking options for BLAS
-    BLAS_LIB="-L$BLAS_LIBDIR -lblas $FLIBS -lpthread"
-    LAPACK_LIB="-L$LAPACK/lib -llapack"  
-    export GOTO_NUM_THREADS=1
-fi
 
 
 if [ $USE_BLAS == openblas ]; then
@@ -316,16 +301,6 @@ fi
 
 function download() {
     wget --timestamping $METIS_URL
-    wget --timestamping $SUITESPARSE_URL
-    if [ $USE_BLAS == openblas ]; then   
-    wget -O OpenBLAS-$OPENBLAS_VERSION.tar.gz $OPENBLAS_URL
-    fi
-    #wget -O GotoBLAS2-$GOTOBLAS_VERSION.tar.gz $GOTOBLAS2_URL
-    wget --timestamping $LAPACK_URL
-    wget --timestamping $QHULL_URL
-    wget --timestamping $ARPACK_URL
-    wget --timestamping $ARPACK_PATCH_URL
-    wget --timestamping $QRUPDATE_URL
 }
 
 # make it visible
@@ -361,7 +336,8 @@ function sucessful() {
   local prefix=$1
   local name=$2
 
-  
+  echo "prefix $prefix $name"
+  echo "name $name"
   if [ $name == llvm ]; then
     # check if llvm was correctly compiled
     if [ -e $prefix/lib/libLLVMCore.a ]; then
@@ -429,12 +405,6 @@ function build() {
 	shift
     done
 
-    if sucessful $prefix $name; then
-	echo "$name already present in $prefix"
-	moduleload $prefix
-	return
-    fi
-
     if [[ $package == ftp* ]] || [[ $package == http* ]]; then
 	file=$(basename $package)
 
@@ -470,43 +440,33 @@ function build() {
 
     make install | tee make_install.log
     cd ..
-
-    moduleload $prefix
 }
 
 
+OPENBLAS_VERSION=0.2.18
+OPENBLAS_URL=http://github.com/xianyi/OpenBLAS/tarball/v$OPENBLAS_VERSION
 
-function GOTOBLAS_build() {
-    if sucessful $GOTOBLAS gotoblas; then
-	echo "GOTOBLAS already present in $GOTOBLAS/lib"
-	moduleload $GOTOBLAS
-	return
-    fi
+function OPENBLAS_build() {
+         echo "instamm openblas $OPENBLAS_URL"
+    wget -O OpenBLAS-$OPENBLAS_VERSION.tar.gz $OPENBLAS_URL
 
-    tar xf GotoBLAS2-1.13.tar.gz
-    cd GotoBLAS2
-# may need two makes (-l -l)
-    make FC=$FC BINARY64=1 USE_THREAD=1 TARGET=NEHALEM | tee make.log
- #make PREFIX=$GOTOBLAS install
-
-    mkdir -p $GOTOBLAS/lib
-    mv libgoto2*  $GOTOBLAS/lib
-    cd  $GOTOBLAS/lib
-    ln -s libgoto2.a libblas.a
-    ln -s libgoto2.so libblas.so
-    cd -
+    tar -xzf OpenBLAS-$OPENBLAS_VERSION.tar.gz
+    cd *OpenBLAS*/
+# use threaded OPENBLAS
+    make FC=$FC BINARY64=1 USE_THREAD=1 -j $JOBS | tee make.log
+# disable threaded OPENBLAS
+#    make FC=$FC BINARY64=1 USE_THREAD=0 -j $JOBS | tee make.log
+    make PREFIX=$OPENBLAS install | tee make_install.log
+    cd $OPENBLAS/lib
+    ln -s libopenblas.a libblas.a
+    ln -s libopenblas.so libblas.so
+    cd - 
     cd ..
-
-    moduleload $GOTOBLAS
 }
+
+
 
 function BLAS_build() {
-    if sucessful $BLAS blas; then
-	echo "reference BLAS already present in $BLAS/lib"
-	moduleload $BLAS
-	return
-    fi
-
     tar -xzf blas.tgz
     cd BLAS
     make FORTRAN=$FC OPTS="$PICFLAG -O3 $FFLAGS" BLASLIB=libblas.a
@@ -514,37 +474,26 @@ function BLAS_build() {
     mkdir -p $BLAS/lib
     cp libblas.a $BLAS/lib
     cd ..
-
-    moduleload $BLAS
 }
 
 function LAPACK_build() {
-    if sucessful $LAPACK lapack; then
-	echo "LAPACK already present in $LAPACK/lib"
-	moduleload $LAPACK
-	return
-    fi
+    wget --timestamping $LAPACK_URL
 
     tar -zxf lapack-$LAPACK_VERSION.tgz
     cd lapack-$LAPACK_VERSION
     cp make.inc.example  make.inc
     make FORTRAN=$FC LOADER=$FC OPTS="-funroll-all-loops -O3 $PICFLAG $FFLAGS" NOOPT="$PICFLAG" PLAT=  \
-	LAPACKLIB=liblapack.a  BLASLIB=$BLAS/lib/libblas.a TIMER=INT_ETIME  lapacklib | tee make.log
+	LAPACKLIB=liblapack.a  BLASLIB=$BLAS_PREFIX/lib/libblas.a TIMER=INT_ETIME  lapacklib | tee make.log
 
     mkdir -p $LAPACK/lib
     mv liblapack.a $LAPACK/lib/
     make clean
     cd ..
-
-    moduleload $LAPACK
 }
 
 function ARPACK_build() {
-    if sucessful $ARPACK arpack; then
-	echo "ARPACK already present in $ARPACK/lib"
-	moduleload $ARPACK
-	return
-    fi
+    wget --timestamping $ARPACK_URL
+    wget --timestamping $ARPACK_PATCH_URL
 
     tar xzvf arpack96.tar.gz
     tar xzvf patch.tar.gz
@@ -567,24 +516,19 @@ function ARPACK_build() {
     mkdir -p $ARPACK/lib
     cp libarpack.a $ARPACK/lib
     cd ..
-
-    moduleload $ARPACK
 }
 
 function METIS5_build() {
+    wget --timestamping $METIS_URL
+
     cd metis-5.0.2
     echo "set (CMAKE_INSTALL_PREFIX $SUITESPARSE )" >> CMakeLists.txt
     make config
     make install
-    moduleload $SUITESPARSE
 }
 
 function QHULL_build() {
-    if sucessful $QHULL qhull; then
-	echo "QHULL already present in $QHULL/lib"
-	moduleload $QHULL
-	return
-    fi
+    wget --timestamping $QHULL_URL
 
     tar -zxf qhull-$QHULL_VERSION-src.tgz
     cd qhull-$QHULL_VERSION
@@ -595,8 +539,6 @@ function QHULL_build() {
     make | tee make.log
     make DESTDIR=$QHULL install | tee make_install.log
     cd ..
-
-    moduleload $QHULL
 }
 
 function SUITESPARSE_build() {
@@ -606,6 +548,7 @@ function SUITESPARSE_build() {
 	return
     fi
 
+    wget --timestamping $SUITESPARSE_URL
     mkdir -p $SUITESPARSE/{lib,include/suitesparse}
 
     rm -Rf SuiteSparse 
@@ -645,19 +588,12 @@ function SUITESPARSE_build() {
 
     cd ..
 
-    moduleload $SUITESPARSE
 }
 
 
 function EPSTOOL_build() {
-    if sucessful $EPSTOOL epstool; then
-	echo "epstool already present in $EPSTOOL/bin"
-	moduleload $EPSTOOL
-	return
-    fi
-
     wget --timestamping $EPSTOOL_URL
-    tar xf epstool-$EPSTOOL_VERSION.tar.gz 
+    tar -xf epstool-$EPSTOOL_VERSION.tar.gz 
     cd epstool-$EPSTOOL_VERSION
     make | tee make.log
     make install EPSTOOL_ROOT=$EPSTOOL  | tee make_install.log
@@ -665,12 +601,6 @@ function EPSTOOL_build() {
 }
 
 function TRANSFIG_build() {
-    if sucessful $TRANSFIG fig2dev; then
-	echo "fig2dev already present in $TRANSFIG/bin"
-	moduleload $TRANSFIG
-	return
-    fi
-
     wget --timestamping $TRANSFIG_URL
     rm -Rf transfig.$TRANSFIG_VERSION/
     tar xf transfig.$TRANSFIG_VERSION.tar.gz 
@@ -695,11 +625,7 @@ function NETCDF_FORTRAN_build() {
 }
 
 function QRUPDATE_build() {
-    if sucessful $QRUPDATE qrupdate; then
-	echo "QRUPDATE already present in $QRUPDATE/lib"
-	moduleload $QRUPDATE
-	return
-    fi
+    wget --timestamping $QRUPDATE_URL
 
     tar zxf qrupdate-$QRUPDATE_VERSION.tar.gz
     cd qrupdate-$QRUPDATE_VERSION
@@ -713,8 +639,6 @@ function QRUPDATE_build() {
     make test     | tee make_test.log
     make PREFIX=$QRUPDATE install
     cd .. 
-
-    moduleload $QRUPDATE
 }
 
 
@@ -726,19 +650,15 @@ function OCTAVE_FORGE_build() {
 
 function all_build() {
 
-    mkdir -p $BASEDIR
+    mkdir -p $PREFIX
 
     if [[ $separate == no ]]; then
-	PKG_CONFIG_PATH="$BASEDIR/lib/pkgconfig:$PKG_CONFIG_PATH"
-	PATH="$BASEDIR/bin:$PATH"
-        CPPFLAGS="-I$BASEDIR/include $CPPFLAGS"
-	LDFLAGS="-L$BASEDIR/lib $LDFLAGS"
-	LD_LIBRARY_PATH="$BASEDIR/lib:$LD_LIBRARY_PATH"
+	PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+	PATH="$PREFIX/bin:$PATH"
+        CPPFLAGS="-I$PREFIX/include $CPPFLAGS"
+	LDFLAGS="-L$PREFIX/lib $LDFLAGS"
+	LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
         export PATH PKG_CONFIG_PATH LD_LIBRARY_PATH LDFLAGS CPPFLAGS
-    fi
-
-    if [[ $dodownload == yes ]]; then
-	download
     fi
 
     if [ $USE_BLAS == openblas ]; then   
@@ -826,6 +746,32 @@ function all_build() {
     octave_forge_build
 }
 
+
+function setup_prefixes() {
+    # loop over all packages
+
+    echo 'here'
+    for version in $(compgen -A variable | grep _VERSION); do
+        NAME=${version%_VERSION}
+        name=$(echo $NAME | tr '[:upper:]' '[:lower:]' | tr _ -)
+
+        # get and set variable by indirection        
+        # http://unix.stackexchange.com/a/68349
+        #echo  $name ${!version}
+        tmp=${NAME}_PREFIX
+
+        # I have to use readonly here
+        # http://stackoverflow.com/a/12158728
+
+        readonly $tmp=$(pkgprefix $name ${!version})
+        #echo "prefix" $name $(pkgprefix $name ${!version})
+    done
+
+    #echo "unit prefix inside ${UNITS_PREFIX}"
+}
+
+
+
 if [[ ! -z $showpath ]]; then
     echo "export PATH=\"$NETCDF/bin:\$PATH\""
     echo "export LD_LIBRARY_PATH=\"$BLAS_LIBDIR:$SUITESPARSE/lib:$FFTW/lib:$QHULL/lib:$HDF5/lib:$GLPK/lib:$PCRE/lib:$NETCDF/lib:$QRUPDATE/lib:\$LD_LIBRARY_PATH\""
@@ -835,22 +781,41 @@ else
     echo "PATH=$PATH"
     echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
-    PACKAGES=(openblas lapack)
+    setup_prefixes
     
     for name in "${PACKAGES[@]}"; do
 	echo $name
-        
         # upcase name
-        NAME=$(echo $name | tr '[:upper:]' '[:lower:]' | tr - _)
-        if [ type -t ${NAME}_build ]; then
-            # call specific build script
-            ${NAME}_build
+        NAME=$(echo $name | tr '[:lower:]' '[:upper:]' | tr - _)
+
+        # get URL and PREFIX
+        url=${NAME}_URL
+        URL=${!url}
+
+        prefix=${NAME}_PREFIX
+        PREFIX=${!prefix}
+
+        echo prefix22 $prefix $PREFIX
+        if sucessful $PREFIX $name; then
+	    echo "$name already present"
+	    moduleload $PREFIX
         else
-            # call generic build script
-            build --package ${${NAME}_URL} --prefix ${NAME}_ --name llvm --check yes \
-	--configArgs "--enable-shared"
-            
-        done
+            if type -t ${NAME}_build; then
+                echo call ${NAME}_build
+                # call specific build script
+                fun=${NAME}_build
+                $fun
+                #${NAME}_build
+            else
+                echo call generic ${NAME}_build
+                # call generic build script            
+
+                build --package $URL --prefix $PREFIX --name $name \
+                  --configArgs "--enable-shared"            
+            fi
+    
+            moduleload $PREFIX
+        fi
     done
 
 fi
