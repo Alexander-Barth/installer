@@ -1,9 +1,9 @@
 #!/bin/bash
 
-local configArgs=
-local makeArgs=
-local packageDir=
-local check=no
+configArgs=
+makeArgs=
+packageDir=
+check=no
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -35,6 +35,13 @@ while [ "$1" != "" ]; do
             shift
             makeArgs="$1"
             ;;
+        "--makeInstallArgs")
+            shift
+            makeInstallArgs="$1"
+            ;;
+        *)
+            echo "unknown $1"
+    ;;
     esac
     shift
 done
@@ -78,6 +85,6 @@ if [[ $check == yes ]]; then
     make check | tee make_check.log
 fi
 
-make install | tee make_install.log
+make install $makeInstallArgs | tee make_install.log
 cd ..
 
