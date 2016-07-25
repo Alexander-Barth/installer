@@ -4,6 +4,7 @@ configArgs=
 makeArgs=
 packageDir=
 check=no
+JOBS=4
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -14,6 +15,10 @@ while [ "$1" != "" ]; do
         "--name")
             shift
             name="$1"
+            ;;
+        "--jobs")
+            shift
+            JOBS="$1"
             ;;
         "--packagedir")
             shift
