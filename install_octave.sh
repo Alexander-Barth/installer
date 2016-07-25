@@ -11,7 +11,7 @@ CC=gcc
 PICFLAG=-fPIC
 FC=gfortran
 FLIBS="-lgfortran"
-JOBS=8
+JOBS=4
 showpath=
 dodownload=yes
 separate=no
@@ -25,7 +25,9 @@ fi
 
 PATCHDIR=$HOME/matlab/bin/patch/
 
-while [ "$1" != "" ]; do
+while [[ $# -gt 1 ]]; do
+    key="$1"
+
     case $1 in
 	--blas)
             shift
@@ -79,11 +81,11 @@ while [ "$1" != "" ]; do
         --cc=*|--c-compiler=)
             CC="${key#*=}"
             ;;
-	"--postfix")
+	--postfix)
 	    shift
             postfix=$1
             ;;
-	"--postfix=*")
+	--postfix=*)
             postfix="${key#*=}"
             ;;
         *)
@@ -96,7 +98,6 @@ done
 
 PACKAGES=( "$@" )
 
-echo what "${PACKAGES}"
 
 if [[ ! $PREFIX ]]; then
     if [[ $separate == yes ]]; then
@@ -105,6 +106,27 @@ if [[ ! $PREFIX ]]; then
         PREFIX=$HOME/local/$CC-$CCVERSION$postfix
     fi
 fi
+
+# print message of a given importance
+
+function message() {
+    local importance=$1
+    local message=$2
+
+    if (( $importance < 1 )); then
+        # ignore
+        return
+    fi
+
+    if [ $importance == 3 ]; then
+        echo -e "\e[32m$message\e[0m"
+    elif [ $importance == 2 ]; then
+        echo -e "\e[34m$message\e[0m"
+    else
+        echo $message
+    fi
+
+}
 
 
 function pkgprefix() {
@@ -120,14 +142,14 @@ function pkgprefix() {
 #  source $f; 
 #done
 
-echo "install in $PREFIX"
-
+message 2 "Request to install ${PACKAGES} in $PREFIX"
 
 
 GCC_VERSION=4.8.2
 GCC_URL=ftp://gcc.gnu.org/pub/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz
 
-BLAS_URL=http://www.netlib.org/blas/blas.tgz
+BLAS_VERSION=3.6.0
+BLAS_URL=http://www.netlib.org/blas/blas-$BLAS_VERSION.tgz
 
 LAPACK_VERSION=3.5.0
 LAPACK_URL=http://www.netlib.org/lapack/lapack-$LAPACK_VERSION.tgz
@@ -254,11 +276,6 @@ if [ $USE_BLAS == MKL ]; then
     export LD_LIBRARY_PATH="$MKL:$LD_LIBRARY_PATH"
 fi
 
-#FFLAGS=-fdefault-integer-8
-
-function download() {
-    wget --timestamping $METIS_URL
-}
 
 # make it visible
 function moduleload() {
@@ -288,6 +305,7 @@ function moduleload() {
     export PATH PKG_CONFIG_PATH LD_LIBRARY_PATH LDFLAGS CPPFLAGS
 }
 
+# check if build what sucessful
 
 function sucessful() {
   local prefix=$1
@@ -317,41 +335,21 @@ function sucessful() {
   return 1;
 }
 
-function message() {
-    local importance=$1
-    local message=$2
 
-    if (( $importance < 1 )); then
-        # ignore
-        return
-    fi
-
-    if [ $importance == 3 ]; then
-        echo -e "\e[32m$message\e[0m"
-    elif [ $importance == 2 ]; then
-        echo -e "\e[34m$message\e[0m"
-    else
-        echo $message
-    fi
-
-}
+# build a generic package
 
 function build() {
     local configArgs=
     local makeArgs=
+    local makeInstallArgs=
     local packageDir=
     local check=no
-    local buildsystem=gnu  # gnu (for configure) or cmake
 
     while [ "$1" != "" ]; do
 	case $1 in
-	    "--package")
+	    "--url")
 		shift
-		package="$1"
-		;;
-	    "--name")
-		shift
-		name="$1"
+		url="$1"
 		;;
 	    "--packagedir")
 		shift
@@ -373,25 +371,25 @@ function build() {
 		shift
 		makeArgs="$1"
 		;;
-	    "--buildsystem")
-		shift
-		buildsystem="$1"
-		;;
+            "--makeInstallArgs")
+                shift
+                makeInstallArgs="$1"
+                ;;
 	esac
 	shift
     done
 
-    if [[ $package == ftp* ]] || [[ $package == http* ]]; then
-	file=$(basename $package)
+    if [[ $url == ftp* ]] || [[ $url == http* ]]; then
+	file=$(basename $url)
 
 	if [ -f $file ]; then
-            echo "$package already downloaded"
+            echo "$url already downloaded"
 	else
-            echo download $package
-            wget $package
+            echo download $url
+            wget $url
 	fi
     else
-	file=$package
+	file=$url
     fi
 
     if [[ -z $packageDir ]]; then
@@ -402,10 +400,12 @@ function build() {
     tar -xf $file
     cd $packageDir
 
-    if [ $buildsystem == gnu ]; then
-      ./configure --prefix=$prefix  $configArgs | tee configure.log
-    else
-      cmake -DCMAKE_INSTALL_PREFIX:PATH=$prefix | tee cmake.log
+    if [ -x ./configure ]; then
+        # gnu autotools
+        ./configure --prefix=$prefix  $configArgs | tee configure.log        
+    elif [ -r ./CMakeLists.txt ]; then
+        # cmake
+        cmake -DCMAKE_INSTALL_PREFIX:PATH=$prefix | tee cmake.log
     fi
 
     make -j $JOBS $makeArgs | tee make.log
@@ -414,7 +414,7 @@ function build() {
 	make check | tee make_check.log
     fi
 
-    make install | tee make_install.log
+    make install $makeInstallArgs | tee make_install.log
     cd ..
 }
 
@@ -444,8 +444,10 @@ function OPENBLAS_build() {
 
 
 function BLAS_build() {
-    tar -xzf blas.tgz
-    cd BLAS
+    wget --timestamping $BLAS_URL
+
+    tar -xzf blas-$BLAS_VERSION.tgz
+    cd BLAS-$BLAS_VERSION
     make FORTRAN=$FC OPTS="$PICFLAG -O3 $FFLAGS" BLASLIB=libblas.a
 
     mkdir -p $BLAS_PREFIX/lib
@@ -620,9 +622,9 @@ function QRUPDATE_build() {
 
 
 function OCTAVE_FORGE_build() {    
-    $OCTAVE/bin/octave --no-init-file --eval 'pkg install -global -forge -verbose general miscellaneous optim struct statistics io octcdf optiminterp netcdf ncarray'
-    $OCTAVE/bin/octave --no-init-file --eval 'pkg install -global -forge -verbose nan'
-    $OCTAVE/bin/octave --no-init-file --eval 'pkg install -global -forge -verbose parallel'
+    $OCTAVE_PREFIX/bin/octave --no-init-file --eval 'pkg install -global -forge -verbose general miscellaneous optim struct statistics io octcdf optiminterp netcdf ncarray'
+    $OCTAVE_PREFIX/bin/octave --no-init-file --eval 'pkg install -global -forge -verbose nan'
+    $OCTAVE_PREFIX/bin/octave --no-init-file --eval 'pkg install -global -forge -verbose parallel'
 }
 
 function all_build() {
@@ -767,6 +769,7 @@ for name in "${PACKAGES[@]}"; do
     prefix=${NAME}_PREFIX
     PREFIX=${!prefix}
 
+    echo "prefix of $name is $PREFIX"
     if sucessful $PREFIX $name; then
         message 2 "$name is already present"
         moduleload $PREFIX
