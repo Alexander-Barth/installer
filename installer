@@ -71,14 +71,14 @@ while [[ $# -gt 1 ]]; do
             shift
             FC="$1"
             ;;
-        --fc=*|--fortran-compiler=)
+        --fc=*|--fortran-compiler=*)
             FC="${key#*=}"
             ;;
         --cc|--c-compiler)
             shift
             CC="$1"
             ;;
-        --cc=*|--c-compiler=)
+        --cc=*|--c-compiler=*)
             CC="${key#*=}"
             ;;
 	--postfix)
@@ -189,8 +189,10 @@ FLTK_URL=http://fltk.org/pub/fltk/$FLTK_VERSION/fltk-$FLTK_VERSION-source.tar.gz
 
 # http://www.unidata.ucar.edu/downloads/netcdf/index.jsp
 NETCDF_VERSION=4.3.3.1
-NETCDF_FORTRAN_VERSION=4.4.2
 NETCDF_URL=http://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-$NETCDF_VERSION.tar.gz
+
+NETCDF_FORTRAN_VERSION=4.4.4
+NETCDF_FORTRAN_URL=ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-fortran-$NETCDF_FORTRAN_VERSION.tar.gz
 
 QRUPDATE_VERSION=1.1.2
 QRUPDATE_URL=http://downloads.sourceforge.net/project/qrupdate/qrupdate/1.2/qrupdate-$QRUPDATE_VERSION.tar.gz
@@ -339,14 +341,18 @@ function sucessful() {
 # build a generic package
 
 function build() {
+    local url=
+    local packageDir=
+    local check=no
     local configArgs=
     local makeArgs=
     local makeInstallArgs=
-    local packageDir=
-    local check=no
 
-    while [ "$1" != "" ]; do
-	case $1 in
+    echo all args "$@"
+    while [[ $# -gt 1 ]]; do
+        key="$1"
+
+	case $key in
 	    "--url")
 		shift
 		url="$1"
@@ -379,6 +385,8 @@ function build() {
 	shift
     done
 
+
+    echo url $url
     if [[ $url == ftp* ]] || [[ $url == http* ]]; then
 	file=$(basename $url)
 
@@ -592,16 +600,16 @@ function TRANSFIG_build() {
     cd ..
 }
 
-function NETCDF_FORTRAN_build() {
+# function NETCDF_FORTRAN_build() {
 
-    tar zxf netcdf-fortran-$NETCDF_FORTRAN_VERSION.tar.gz
-    cd netcdf-fortran-$NETCDF_VERSION
-    ./configure FC=$FC CPPFLAGS="-I$HDF5_PREFIX/include"  LDFLAGS="-L$HDF5_PREFIX/lib" --prefix=$NETCDF_FORTRAN_PREFIX
-    make -j $JOBS | tee make.log
-    make check | tee make_check.log
-    make install | tee make_install.log
-    cd .. 
-}
+#     tar zxf netcdf-fortran-$NETCDF_FORTRAN_VERSION.tar.gz
+#     cd netcdf-fortran-$NETCDF_VERSION
+#     ./configure FC=$FC CPPFLAGS="-I$HDF5_PREFIX/include"  LDFLAGS="-L$HDF5_PREFIX/lib" --prefix=$NETCDF_FORTRAN_PREFIX
+#     make -j $JOBS | tee make.log
+#     make check | tee make_check.log
+#     make install | tee make_install.log
+#     cd .. 
+# }
 
 function QRUPDATE_build() {
     wget --timestamping $QRUPDATE_URL
@@ -629,16 +637,6 @@ function OCTAVE_FORGE_build() {
 
 function all_build() {
 
-    mkdir -p $PREFIX
-
-    if [[ $separate == no ]]; then
-	PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-	PATH="$PREFIX/bin:$PATH"
-        CPPFLAGS="-I$PREFIX/include $CPPFLAGS"
-	LDFLAGS="-L$PREFIX/lib $LDFLAGS"
-	LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
-        export PATH PKG_CONFIG_PATH LD_LIBRARY_PATH LDFLAGS CPPFLAGS
-    fi
 
     if [ $USE_BLAS == openblas ]; then   
 	OPENBLAS_build
@@ -749,13 +747,20 @@ function setup_prefixes() {
 }
 
 
-
-#    all_build
+if [[ $separate == no ]]; then
+	PATH="$PREFIX/bin:$PATH"
+        CPPFLAGS="-I$PREFIX/include $CPPFLAGS"
+	LDFLAGS="-L$PREFIX/lib $LDFLAGS"
+	LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
+	PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+fi
 
 echo "PATH=$PATH"
 echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
 setup_prefixes
+
+
 
 for name in "${PACKAGES[@]}"; do
     echo $name
@@ -771,8 +776,9 @@ for name in "${PACKAGES[@]}"; do
 
     echo "prefix of $name is $PREFIX"
     if sucessful $PREFIX $name; then
-        message 2 "$name is already present"
+        message 2 "$name is already present under $PREFIX"
         moduleload $PREFIX
+            echo LDFLAGS $LDFLAGS
     else
         message 3 "installing $name"
         if type -t ${NAME}_build > /dev/null; then
@@ -781,8 +787,12 @@ for name in "${PACKAGES[@]}"; do
             ${NAME}_build
         else
             message 0 "call generic build script"
+            echo package "$URL" prefix $PREFIX name $name
 
-            build --package $URL --prefix $PREFIX --name $name \
+            echo LDFLAGS $LDFLAGS
+            export FC CC CPPFLAGS LDFLAGS PATH LD_LIBRARY_PATH PKG_CONFIG_PATH
+            
+            build --url "$URL" --prefix $PREFIX --name $name \
               --configArgs "--enable-shared --disable-static"
         fi
 
