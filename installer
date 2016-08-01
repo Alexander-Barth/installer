@@ -148,6 +148,9 @@ message 2 "Request to install ${PACKAGES} in $PREFIX"
 GCC_VERSION=4.8.2
 GCC_URL=ftp://gcc.gnu.org/pub/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz
 
+OPENBLAS_VERSION=0.2.18
+OPENBLAS_URL=http://github.com/xianyi/OpenBLAS/tarball/v$OPENBLAS_VERSION
+
 BLAS_VERSION=3.6.0
 BLAS_URL=http://www.netlib.org/blas/blas-$BLAS_VERSION.tgz
 
@@ -188,7 +191,7 @@ FLTK_VERSION=1.3.2
 FLTK_URL=http://fltk.org/pub/fltk/$FLTK_VERSION/fltk-$FLTK_VERSION-source.tar.gz
 
 # http://www.unidata.ucar.edu/downloads/netcdf/index.jsp
-NETCDF_VERSION=4.3.3.1
+NETCDF_VERSION=4.4.1
 NETCDF_URL=http://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-$NETCDF_VERSION.tar.gz
 
 NETCDF_FORTRAN_VERSION=4.4.4
@@ -252,31 +255,30 @@ OCTAVE_URL=ftp://ftp.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
 #OCTAVE_URL=ftp://alpha.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
 
 
+function setup_prefixes() {
+    # loop over all packages
 
+    for version in $(compgen -A variable | grep _VERSION); do
+        NAME=${version%_VERSION}
+        name=$(echo $NAME | tr '[:upper:]' '[:lower:]' | tr _ -)
 
-if [ $USE_BLAS == openblas ]; then
-    echo "using openblas"
-    BLAS=$OPENBLAS
-    BLAS_LIBDIR="$BLAS_PREFIX/lib"
-  # full linking options for BLAS
-    BLAS_LIB="-L$BLAS_LIBDIR -lopenblas $FLIBS -lpthread"
-    LAPACK_LIB="$BLAS_LIB"
-    LAPACK_LIBDIR="$BLAS_LIBDIR"
-fi
+        # get and set variable by indirection        
+        # http://unix.stackexchange.com/a/68349
+        #echo  $name ${!version}
+        tmp=${NAME}_PREFIX
 
-if [ $USE_BLAS == MKL ]; then
-    echo "using MKL"
-# intel MKL
-#MKL=
-    BLAS_LIBDIR="$MKL"
-    LAPACK_LIBDIR="$MKL"
+        # I have to use readonly here
+        # http://stackoverflow.com/a/12158728
 
-    #MKL_LIB="-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group -liomp5 -lpthread"
-    MKL_LIB="-L$MKL -Wl,--start-group -lmkl_gf_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -L$INTEL_CC_HOME/compiler/lib/intel64/ -liomp5 -lpthread"
-    BLAS_LIB="$MKL_LIB"
-    LAPACK_LIB="$MKL_LIB"
-    export LD_LIBRARY_PATH="$MKL:$LD_LIBRARY_PATH"
-fi
+        readonly $tmp=$(pkgprefix $name ${!version})
+        #echo "prefix" $name $(pkgprefix $name ${!version})
+    done
+
+    #echo "unit prefix inside ${UNITS_PREFIX}"
+}
+
+setup_prefixes
+
 
 
 # make it visible
@@ -313,8 +315,8 @@ function sucessful() {
   local prefix=$1
   local name=$2
 
-  echo "prefix $prefix $name"
-  echo "name $name"
+  #echo "prefix $prefix $name"
+  #echo "name $name"
   if [ $name == llvm ]; then
     # check if llvm was correctly compiled
     if [ -e $prefix/lib/libLLVMCore.a ]; then
@@ -348,7 +350,7 @@ function build() {
     local makeArgs=
     local makeInstallArgs=
 
-    echo all args "$@"
+    #echo all args "$@"
     while [[ $# -gt 1 ]]; do
         key="$1"
 
@@ -386,14 +388,14 @@ function build() {
     done
 
 
-    echo url $url
+    #echo url $url
     if [[ $url == ftp* ]] || [[ $url == http* ]]; then
 	file=$(basename $url)
 
 	if [ -f $file ]; then
             echo "$url already downloaded"
 	else
-            echo download $url
+            message 2 "download $url"
             wget $url
 	fi
     else
@@ -427,11 +429,8 @@ function build() {
 }
 
 
-OPENBLAS_VERSION=0.2.18
-OPENBLAS_URL=http://github.com/xianyi/OpenBLAS/tarball/v$OPENBLAS_VERSION
 
 function OPENBLAS_build() {
-         echo "instamm openblas $OPENBLAS_URL"
     wget -O OpenBLAS-$OPENBLAS_VERSION.tar.gz $OPENBLAS_URL
 
     tar -xzf OpenBLAS-$OPENBLAS_VERSION.tar.gz
@@ -724,27 +723,6 @@ function all_build() {
 }
 
 
-function setup_prefixes() {
-    # loop over all packages
-
-    for version in $(compgen -A variable | grep _VERSION); do
-        NAME=${version%_VERSION}
-        name=$(echo $NAME | tr '[:upper:]' '[:lower:]' | tr _ -)
-
-        # get and set variable by indirection        
-        # http://unix.stackexchange.com/a/68349
-        #echo  $name ${!version}
-        tmp=${NAME}_PREFIX
-
-        # I have to use readonly here
-        # http://stackoverflow.com/a/12158728
-
-        readonly $tmp=$(pkgprefix $name ${!version})
-        #echo "prefix" $name $(pkgprefix $name ${!version})
-    done
-
-    #echo "unit prefix inside ${UNITS_PREFIX}"
-}
 
 
 if [[ $separate == no ]]; then
@@ -755,48 +733,71 @@ if [[ $separate == no ]]; then
 	PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
 fi
 
-echo "PATH=$PATH"
-echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
-setup_prefixes
+if [ $USE_BLAS == openblas ]; then
+    echo "using openblas"
+    BLAS=$OPENBLAS
+    BLAS_LIBDIR="$BLAS_PREFIX/lib"
+  # full linking options for BLAS
+    BLAS_LIB="-L$BLAS_LIBDIR -lopenblas $FLIBS -lpthread"
+    LAPACK_LIB="$BLAS_LIB"
+    LAPACK_LIBDIR="$BLAS_LIBDIR"
+fi
 
+if [ $USE_BLAS == MKL ]; then
+    echo "using MKL"
+# intel MKL
+#MKL=
+    BLAS_LIBDIR="$MKL"
+    LAPACK_LIBDIR="$MKL"
+
+    #MKL_LIB="-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group -liomp5 -lpthread"
+    MKL_LIB="-L$MKL -Wl,--start-group -lmkl_gf_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -L$INTEL_CC_HOME/compiler/lib/intel64/ -liomp5 -lpthread"
+    BLAS_LIB="$MKL_LIB"
+    LAPACK_LIB="$MKL_LIB"
+    export LD_LIBRARY_PATH="$MKL:$LD_LIBRARY_PATH"
+fi
 
 
 for name in "${PACKAGES[@]}"; do
-    echo $name
+    #echo $name
+
     # upcase name
     NAME=$(echo $name | tr '[:lower:]' '[:upper:]' | tr - _)
 
-    # get URL and PREFIX
+    # get PACKAGE_URL and PACKAGE_PREFIX
     url=${NAME}_URL
-    URL=${!url}
+    PACKAGE_URL=${!url}
 
     prefix=${NAME}_PREFIX
-    PREFIX=${!prefix}
+    PACKAGE_PREFIX=${!prefix}
 
-    echo "prefix of $name is $PREFIX"
-    if sucessful $PREFIX $name; then
-        message 2 "$name is already present under $PREFIX"
-        moduleload $PREFIX
-            echo LDFLAGS $LDFLAGS
+    echo "prefix of $name is $PACKAGE_PREFIX"
+    if sucessful $PACKAGE_PREFIX $name; then
+        message 2 "$name is already present under $PACKAGE_PREFIX"
+        moduleload $PACKAGE_PREFIX
+#            echo LDFLAGS $LDFLAGS
     else
         message 3 "installing $name"
+
+        # make environement variables available for build process
+        export FC CC CPPFLAGS LDFLAGS PATH LD_LIBRARY_PATH PKG_CONFIG_PATH
+
+        # check if specific build script exists
         if type -t ${NAME}_build > /dev/null; then
             message 0 "call ${NAME}_build"
             # call specific build script
             ${NAME}_build
         else
+            # assuming GNU autotools or CMake
             message 0 "call generic build script"
-            echo package "$URL" prefix $PREFIX name $name
-
-            echo LDFLAGS $LDFLAGS
-            export FC CC CPPFLAGS LDFLAGS PATH LD_LIBRARY_PATH PKG_CONFIG_PATH
+            #echo package "$PACKAGE_URL" prefix $PACKAGE_PREFIX name $name
             
-            build --url "$URL" --prefix $PREFIX --name $name \
+            build --url "$PACKAGE_URL" --prefix $PACKAGE_PREFIX --name $name \
               --configArgs "--enable-shared --disable-static"
         fi
 
-        moduleload $PREFIX
+        moduleload $PACKAGE_PREFIX
     fi
 done
 
