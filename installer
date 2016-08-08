@@ -225,8 +225,13 @@ FONTCONFIG_URL=http://www.freedesktop.org/software/fontconfig/release/fontconfig
 GRAPHICSMAGICK_VERSION=1.3.24
 GRAPHICSMAGICK_URL=http://downloads.sourceforge.net/project/graphicsmagick/graphicsmagick/$GRAPHICSMAGICK_VERSION/GraphicsMagick-$GRAPHICSMAGICK_VERSION.tar.gz
 
+ZIP_VERSION=1.1.3
+ZIP_URL=https://nih.at/libzip/libzip-$ZIP_VERSION.tar.gz
+
 PSTOEDIT_VERSION=3.62
-PSTOEDIT_URL=http://sourceforge.net/projects/pstoedit/files/pstoedit/$PSTOEDIT_VERSION/pstoedit-$PSTOEDIT_VERSION.tar.gz
+PSTOEDIT_VERSION=3.70
+#PSTOEDIT_URL=http://sourceforge.net/projects/pstoedit/files/pstoedit/$PSTOEDIT_VERSION/pstoedit-$PSTOEDIT_VERSION.tar.gz
+PSTOEDIT_URL=http://downloads.sourceforge.net/project/pstoedit/pstoedit/$PSTOEDIT_VERSION/pstoedit-$PSTOEDIT_VERSION.tar.gz
 
 LLVM_VERSION=3.3
 LLVM_URL=http://llvm.org/releases/$LLVM_VERSION/llvm-$LLVM_VERSION.src.tar.gz
@@ -241,13 +246,18 @@ EPSTOOL_URL=http://pkgs.fedoraproject.org/repo/pkgs/epstool/epstool-3.08.tar.gz/
 
 
 TRANSFIG_VERSION=3.2.5e
-TRANSFIG_URL=https://downloads.sourceforge.net/project/mcj/mcj-source/transfig.$TRANSFIG_VERSION.tar.gz
+#TRANSFIG_URL=https://downloads.sourceforge.net/project/mcj/mcj-source/transfig.$TRANSFIG_VERSION.tar.gz
+TRANSFIG_URL=http://ufpr.dl.sourceforge.net/project/mcj/mcj-source/transfig.$TRANSFIG_VERSION.tar.gz
 
 TIFF_VERSION=4.0.3
 TIFF_URL=ftp://ftp.remotesensing.org/libtiff/tiff-$TIFF_VERSION.tar.gz
 
 UNITS_VERSION=2.11
 UNITS_URL=http://ftp.gnu.org/gnu/units/units-$UNITS_VERSION.tar.gz
+
+XFT_VERSION=2.3.1
+XFT_URL=https://www.x.org/releases/individual/lib/libXft-$XFT_VERSION.tar.gz
+
 
 OCTAVE_VERSION=4.0.3
 OCTAVE_URL=ftp://ftp.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
@@ -323,6 +333,21 @@ function sucessful() {
       return 0;
     fi
   fi
+
+  if [ $name == fftw ]; then
+    # check if fftw was correctly compiled
+    if [ -e $prefix/lib/libfftw3.so ]; then
+      return 0;
+    fi
+  fi
+
+  if [ $name == texinfo ]; then
+    # check if texinfo was correctly compiled
+    if [ -e $prefix/bin/makeinfo ]; then
+      return 0;
+    fi
+  fi
+
 
   if [ -e $prefix/lib/lib$name.so ]; then
       return 0;
@@ -403,11 +428,23 @@ function build() {
     fi
 
     if [[ -z $packageDir ]]; then
-	packageDir=$(echo $file | sed 's/.tar.*//')
+        if [[ $file == *.tgz ]]; then
+	    packageDir=${file%.tgz}
+        else
+	    packageDir=$(echo $file | sed 's/.tar.*//')
+        fi
     fi
 
     rm -Rf $packageDir
     tar -xf $file
+
+    # for gl2ps
+    if [ ! -d "$packageDir" ]; then
+        if [ -d "$packageDir-source" ]; then
+            packageDir="$packageDir-source"
+        fi
+    fi
+
     cd $packageDir
 
     if [ -x ./configure ]; then
