@@ -156,16 +156,19 @@ BLAS_URL=http://www.netlib.org/blas/blas-$BLAS_VERSION.tgz
 
 LAPACK_VERSION=3.5.0
 LAPACK_URL=http://www.netlib.org/lapack/lapack-$LAPACK_VERSION.tgz
+LAPACK_DEP="openblas"
 
 ARPACK_VERSION=96
 ARPACK_URL=http://www.caam.rice.edu/software/ARPACK/SRC/arpack96.tar.gz
 ARPACK_PATCH_URL=http://www.caam.rice.edu/software/ARPACK/SRC/patch.tar.gz
+ARPACK_DEP="lapack openblas"
 
  #http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.0.2.tar.gz # incompatible with suitesparse 3.7 and  4.0.1
 METIS_URL=http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/OLD/metis-4.0.3.tar.gz
 
 SUITESPARSE_VERSION=4.2.1
 SUITESPARSE_URL=http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-$SUITESPARSE_VERSION.tar.gz
+SUITESPARSE_DEP="lapack openblas"
 
 # http://www.fftw.org/download.html
 FFTW_VERSION=3.3.4
@@ -193,12 +196,15 @@ FLTK_URL=http://fltk.org/pub/fltk/$FLTK_VERSION/fltk-$FLTK_VERSION-source.tar.gz
 # http://www.unidata.ucar.edu/downloads/netcdf/index.jsp
 NETCDF_VERSION=4.4.1
 NETCDF_URL=http://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-$NETCDF_VERSION.tar.gz
+NETCDF_DEP="hdf5"
 
 NETCDF_FORTRAN_VERSION=4.4.4
 NETCDF_FORTRAN_URL=ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-fortran-$NETCDF_FORTRAN_VERSION.tar.gz
+NETCDF_FORTRAN_DEP="netcdf"
 
 QRUPDATE_VERSION=1.1.2
 QRUPDATE_URL=http://downloads.sourceforge.net/project/qrupdate/qrupdate/1.2/qrupdate-$QRUPDATE_VERSION.tar.gz
+QRUPDATE_DEP="lapack openblas"
 
 # http://curl.haxx.se/download.html
 CURL_VERSION=7.50.0
@@ -224,6 +230,7 @@ FONTCONFIG_URL=http://www.freedesktop.org/software/fontconfig/release/fontconfig
 
 GRAPHICSMAGICK_VERSION=1.3.24
 GRAPHICSMAGICK_URL=http://downloads.sourceforge.net/project/graphicsmagick/graphicsmagick/$GRAPHICSMAGICK_VERSION/GraphicsMagick-$GRAPHICSMAGICK_VERSION.tar.gz
+GRAPHICSMAGICK_DEP="tiff"
 
 ZIP_VERSION=1.1.3
 ZIP_URL=https://nih.at/libzip/libzip-$ZIP_VERSION.tar.gz
@@ -263,7 +270,7 @@ OCTAVE_VERSION=4.0.3
 OCTAVE_URL=ftp://ftp.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
 #OCTAVE_VERSION=4.0.0-rc2
 #OCTAVE_URL=ftp://alpha.gnu.org/gnu/octave/octave-$OCTAVE_VERSION.tar.xz
-
+OCTAVE_DEP="openblas lapack pcre readline arpack curl fftw fontconfig freetype glpk gl2ps gnuplot graphicsmagick hdf5 qhull qrupdate suitesparse zlib"
 
 function setup_prefixes() {
     # loop over all packages
@@ -794,6 +801,26 @@ if [ $USE_BLAS == MKL ]; then
     LAPACK_LIB="$MKL_LIB"
     export LD_LIBRARY_PATH="$MKL:$LD_LIBRARY_PATH"
 fi
+
+# resolve dependencies
+
+# packages with dependencies
+PACKAGES_DEP=("${PACKAGES[@]}")
+
+
+for name in "${PACKAGES_DEP[@]}"; do
+    # upcase name
+    NAME=$(echo $name | tr '[:lower:]' '[:upper:]' | tr - _)
+
+    # get PACKAGE_DEP
+    dep=${NAME}_DEP
+    PACKAGE_DEP=${!dep}
+
+    
+    if [ ! -z "$PACKAGE_DEP" ]; then
+        
+    fi
+done
 
 
 for name in "${PACKAGES[@]}"; do
