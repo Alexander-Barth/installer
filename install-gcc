@@ -1,0 +1,59 @@
+#!/bin/bash
+
+GCC_VERSION=7.1.0
+#GCC_VERSION=6.3.0
+GCC_URL=ftp://gcc.gnu.org/pub/gcc/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz
+
+GMP_VERSION=6.1.2
+GMP_URL=https://gmplib.org/download/gmp/gmp-$GMP_VERSION.tar.lz
+
+MPFR_VERSION=3.1.5
+MPFR_URL=http://www.mpfr.org/mpfr-current/mpfr-$MPFR_VERSION.tar.gz
+
+MPC_VERSION=1.0.3
+MPC_URL=ftp://ftp.gnu.org/gnu/mpc/mpc-$MPC_VERSION.tar.gz
+
+CC=gcc
+PREFIX=$HOME/local/gcc-7.1.0/
+#PREFIX=$HOME/local/gcc-6.3.0/
+JOBS=5
+
+
+export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
+
+wget -O gmp-$GMP_VERSION.tar.lz $GMP_URL
+tar -xf gmp-$GMP_VERSION.tar.lz
+cd gmp-$GMP_VERSION;
+./configure  --prefix=$PREFIX  CC=$CC && make -j $JOBS && make install
+cd ..
+
+wget -O mpfr-$MPFR_VERSION.tar.gz $MPFR_URL
+tar -xzf mpfr-$MPFR_VERSION.tar.gz
+cd mpfr-$MPFR_VERSION;
+./configure  --prefix=$PREFIX  CC=$CC CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" && make -j $JOBS && make install
+#make check
+cd ..
+
+wget -O mpc-$MPC_VERSION.tar.gz $MPC_URL
+tar -xzf mpc-$MPC_VERSION.tar.gz
+cd mpc-$MPC_VERSION;
+./configure  --prefix=$PREFIX  CC=$CC CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" && make -j $JOBS && make install
+#make check
+cd ..
+
+
+wget -O gcc-$GCC_VERSION.tar.gz $GCC_URL
+tar -xzf gcc-$GCC_VERSION.tar.gz
+mkdir build-gcc
+cd build-gcc
+# does not work with CPPFLAGS and LDFLAGS
+# https://gcc.gnu.org/ml/gcc-help/2016-06/msg00018.html
+
+#collect2: error: ld returned 1 exit status
+#../../gcc-7.1.0/gcc/lto/Make-lang.in:81: recipe for target 'lto1' failed
+#make[3]: *** [lto1] Error 1
+# use --disable-lto with 7.1.0
+
+# ../gcc-$GCC_VERSION/configure  --prefix=$PREFIX --enable-languages=c,fortran CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" CC=$CC
+../gcc-$GCC_VERSION/configure  --prefix=$PREFIX --enable-languages=c,fortran --with-mpfr=$PREFIX --with-gmp=$PREFIX --with-mpc=$PREFIX CC=$CC && make -j $JOBS && make install
+cd ..
