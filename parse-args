@@ -1,0 +1,64 @@
+
+while [[ $# -gt 1 ]]; do
+    key="$1"
+
+    case $1 in
+	--blas)
+            shift
+            USE_BLAS=$1
+            ;;
+	--blas=*)
+            USE_BLAS="${key#*=}"
+            ;;
+	-j | --jobs)
+	    shift
+            JOBS="$1"
+            ;;
+        -j=*|--jobs=*)
+            JOBS="${key#*=}"
+            ;;
+	--showpath)
+	    showpath=1
+	    ;;
+	--download)
+            shift
+	    dodownload=$1
+	    ;;
+	--download=*)
+	    dodownload="${key#*=}"
+	    ;;
+	-b | --basedir | --prefix)
+	    shift
+            PREFIX=$1
+            ;;
+        -p=*|--prefix=*)
+            PREFIX="${key#*=}"
+            ;;
+        --fc|--fortran-compiler)
+            shift
+            FC="$1"
+            ;;
+        --fc=*|--fortran-compiler=*)
+            FC="${key#*=}"
+            ;;
+        --cc|--c-compiler)
+            shift
+            CC="$1"
+            ;;
+        --cc=*|--c-compiler=*)
+            CC="${key#*=}"
+            ;;
+	--postfix)
+	    shift
+            postfix=$1
+            ;;
+	--postfix=*)
+            postfix="${key#*=}"
+            ;;
+        *)
+	    break
+            # unknown option
+
+    esac
+    shift
+done
