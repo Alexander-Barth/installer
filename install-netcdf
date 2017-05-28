@@ -6,7 +6,13 @@ CC=gcc
 PREFIX=$HOME/Assim/OAK/deps
 JOBS=5
 
-source parse-args
+dir="$(dirname "$0")"
+source "$dir/parse-args"
+
+parseargs "$@"
+
+
+echo "prefix $PREFIX"
 
 HDF5_VERSION=1.10.1
 #HDF5_URL=https://www.hdfgroup.org/ftp/HDF5/releases/hdf5-$HDF5_VERSION/src/hdf5-$HDF5_VERSION.tar.gz

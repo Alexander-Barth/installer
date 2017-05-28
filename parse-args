@@ -1,8 +1,9 @@
+function parseargs {
 
-while [[ $# -gt 1 ]]; do
+while [[ $# -ge 1 ]]; do
+
     key="$1"
-
-    case $1 in
+    case "$key" in
 	--blas)
             shift
             USE_BLAS=$1
@@ -62,3 +63,5 @@ while [[ $# -gt 1 ]]; do
     esac
     shift
 done
+
+}
