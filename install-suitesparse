@@ -34,3 +34,5 @@ fi
 
 make config
 make -j 5
+
+make install INSTALL="$PREFIX"
