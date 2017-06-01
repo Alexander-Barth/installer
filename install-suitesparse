@@ -1,0 +1,36 @@
+#!/bin/bash
+
+FC=ifort
+F90C=$FC
+CC=gcc
+PREFIX=$HOME/Assim/OAK/deps
+JOBS=5
+
+
+dir="$(dirname "$0")"
+source "$dir/parse-args"
+
+parseargs "$@"
+
+
+wget http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-4.5.5.tar.gz
+tar -xvf SuiteSparse-4.5.5.tar.gz
+cd SuiteSparse
+
+#Check the configuration:
+
+MKL_LIBDIR=/cluster/compilers/intel/ictce/3.2.2.013/mkl/10.2.2.025/lib/em64t
+MKL_LIBDIR=/apps/brussel/interlagos/software/imkl/2017.1.132-iimpi-2017a/mkl/lib/intel64
+
+export LD_LIBRARY_PATH="$MKL_LIBDIR:$LD_LIBRARY_PATH"
+
+if [[ "$CC" == *gcc ]]; then
+  export BLAS="-L$MKL_LIBDIR -lmkl_gf_lp64 -lmkl_sequential -lmkl_core" 
+  export LAPACK="$BLAS"
+else
+  export BLAS="-L$MKL_LIBDIR -lmkl_intel_lp64 -lmkl_sequential -lmkl_core" 
+  export LAPACK="$BLAS"
+fi
+
+make config
+make -j 5
